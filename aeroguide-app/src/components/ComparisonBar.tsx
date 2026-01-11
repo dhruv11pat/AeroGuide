@@ -1,7 +1,7 @@
 import { X, ArrowRight } from 'lucide-react';
 
 interface School {
-  id: number;
+  id: number | string;
   name: string;
   location: string;
   rating: number;
@@ -15,7 +15,7 @@ interface School {
 
 interface ComparisonBarProps {
   selectedSchools: School[];
-  onRemove: (id: number) => void;
+  onRemove: (id: number | string) => void;
   onCompare: () => void;
   onClear: () => void;
 }
@@ -24,23 +24,23 @@ export function ComparisonBar({ selectedSchools, onRemove, onCompare, onClear }:
   if (selectedSchools.length === 0) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-600 shadow-2xl z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-blue-600 shadow-2xl z-50 max-w-full overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 flex-1 overflow-x-auto">
-            <span className="font-semibold text-gray-700 whitespace-nowrap">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 flex-1 overflow-x-auto max-w-full">
+            <span className="font-semibold text-gray-700 whitespace-nowrap flex-shrink-0">
               Compare Schools ({selectedSchools.length}/3)
             </span>
-            <div className="flex gap-3">
+            <div className="flex gap-3 overflow-x-auto pb-2">
               {selectedSchools.map((school) => (
                 <div
                   key={school.id}
-                  className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center gap-2 whitespace-nowrap"
+                  className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-center gap-2 whitespace-nowrap flex-shrink-0"
                 >
-                  <span className="font-medium text-blue-900">{school.name}</span>
+                  <span className="font-medium text-blue-900 truncate max-w-[150px]">{school.name}</span>
                   <button
                     onClick={() => onRemove(school.id)}
-                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                    className="text-blue-600 hover:text-blue-800 transition-colors flex-shrink-0"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -48,7 +48,7 @@ export function ComparisonBar({ selectedSchools, onRemove, onCompare, onClear }:
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               onClick={onClear}
               className="text-gray-600 hover:text-gray-800 transition-colors whitespace-nowrap"

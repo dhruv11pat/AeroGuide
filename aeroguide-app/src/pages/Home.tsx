@@ -1,26 +1,96 @@
-import { useState } from 'react';
-import { Search, Menu, Plane, MapPin } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Menu, Plane, MapPin, Loader2 } from 'lucide-react';
 import { SchoolCard } from '../components/SchoolCard.tsx';
 import { ComparisonModal } from '../components/ComparisonModal.tsx';
 import { ComparisonBar } from '../components/ComparisonBar.tsx';
 import { AnimatedCounter } from '../components/util-components/AnimatedCounter.tsx';
-import { flyingSchools , type FlyingSchool} from '../../utils/example-schools';
+import { type FlyingSchool} from '../../utils/example-schools';
+import { fetchSchools, searchSchools } from '../api/schools';
 import Footer from '../components/Footer.tsx';
 
-export default function App() {
+export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [selectedSchools, setSelectedSchools] = useState<FlyingSchool[]>([]);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [schools, setSchools] = useState<FlyingSchool[]>([]);
+  const [displayedSchools, setDisplayedSchools] = useState<FlyingSchool[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalSchools, setTotalSchools] = useState(0);
 
   const MAX_COMPARE = 3;
+  const LOAD_LIMIT = 6;
 
-  const filteredSchools = flyingSchools.filter((school) => {
-    const matchesSearch = school.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      school.location.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesLocation = selectedLocation === 'all' || school.location.includes(selectedLocation);
-    return matchesSearch && matchesLocation;
-  });
+  // Initial load
+  useEffect(() => {
+    loadInitialSchools();
+  }, []);
+
+  const loadInitialSchools = async () => {
+    setLoading(true);
+    try {
+      const response = await fetchSchools(LOAD_LIMIT, 0);
+      setSchools(response.schools);
+      setDisplayedSchools(response.schools);
+      setHasMore(response.hasMore);
+      setTotalSchools(response.total);
+      setOffset(LOAD_LIMIT);
+    } catch (error) {
+      console.error('Error loading schools:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadMore = async () => {
+    setLoading(true);
+    try {
+      const response = await fetchSchools(LOAD_LIMIT, offset);
+      const newSchools = [...schools, ...response.schools];
+      setSchools(newSchools);
+      setDisplayedSchools(applyLocationFilter(newSchools));
+      setHasMore(response.hasMore);
+      setOffset(offset + LOAD_LIMIT);
+    } catch (error) {
+      console.error('Error loading more schools:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchInput.trim()) {
+      loadInitialSchools();
+      setSearchQuery('');
+      return;
+    }
+
+    setSearchLoading(true);
+    setSearchQuery(searchInput);
+    try {
+      const results = await searchSchools(searchInput);
+      setSchools(results);
+      setDisplayedSchools(applyLocationFilter(results));
+      setHasMore(false); // Disable load more for search results
+    } catch (error) {
+      console.error('Error searching schools:', error);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  const applyLocationFilter = (schoolsList: FlyingSchool[]) => {
+    if (selectedLocation === 'all') return schoolsList;
+    return schoolsList.filter(school => school.location.includes(selectedLocation));
+  };
+
+  useEffect(() => {
+    setDisplayedSchools(applyLocationFilter(schools));
+  }, [selectedLocation]);
 
   const handleCompareToggle = (school: FlyingSchool) => {
     setSelectedSchools((prev) => {
@@ -73,8 +143,9 @@ export default function App() {
                 <input
                   type="text"
                   placeholder="Search by school name or location..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   className="flex-1 bg-transparent outline-none text-gray-900 placeholder-gray-500"
                 />
               </div>
@@ -93,8 +164,19 @@ export default function App() {
                   <option value="NV">Nevada</option>
                 </select>
               </div>
-              <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
-                Search
+              <button 
+                onClick={handleSearch}
+                disabled={searchLoading}
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {searchLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  'Search'
+                )}
               </button>
             </div>
           </div>
@@ -146,9 +228,11 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="mb-2">Featured Flight Schools</h2>
+              <h2 className="mb-2">
+                {searchQuery ? `Search Results for "${searchQuery}"` : 'Featured Flight Schools'}
+              </h2>
               <p className="text-gray-600">
-                Showing {filteredSchools.length} of {flyingSchools.length} schools
+                Showing {displayedSchools.length} {totalSchools > 0 && !searchQuery ? `of ${totalSchools}` : ''} schools
               </p>
             </div>
             <div className="flex items-center gap-4">
@@ -162,24 +246,61 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredSchools.map((school) => (
-              <SchoolCard 
-                key={school.id} 
-                {...school} 
-                isSelected={selectedSchools.some((s) => s.id === school.id)}
-                onCompareToggle={() => handleCompareToggle(school)}
-                compareDisabled={selectedSchools.length >= MAX_COMPARE}
-              />
-            ))}
-          </div>
-
-          {filteredSchools.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-gray-500">
-                No schools found matching your criteria. Try adjusting your search.
-              </p>
+          {loading && displayedSchools.length === 0 ? (
+            <div className="flex justify-center items-center py-16">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {displayedSchools.map((school) => (
+                  <SchoolCard 
+                    key={school.id} 
+                    {...school} 
+                    isSelected={selectedSchools.some((s) => s.id === school.id)}
+                    onCompareToggle={() => handleCompareToggle(school)}
+                    compareDisabled={selectedSchools.length >= MAX_COMPARE}
+                  />
+                ))}
+              </div>
+
+              {displayedSchools.length === 0 && !loading && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500">
+                    No schools found matching your criteria. Try adjusting your search.
+                  </p>
+                </div>
+              )}
+
+              {/* Load More Button */}
+              {hasMore && !searchQuery && displayedSchools.length > 0 && (
+                <div className="mt-12 text-center">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loading}
+                    className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Schools'
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* No More Schools Message */}
+              {!hasMore && !searchQuery && displayedSchools.length > 0 && (
+                <div className="mt-12 text-center">
+                  <p className="text-gray-500 font-medium">
+                    No more schools to display
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>

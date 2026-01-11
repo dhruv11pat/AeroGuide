@@ -1,7 +1,10 @@
 import { MapPin, Star, Clock, Users, Award, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ImageWithFallback } from './ImageWithFallback';
+import { useAuth } from '../context/AuthContext';
 
 interface SchoolCardProps {
+  id: number | string;
   name: string;
   location: string;
   rating: number;
@@ -17,6 +20,7 @@ interface SchoolCardProps {
 }
 
 export function SchoolCard({
+  id,
   name,
   location,
   rating,
@@ -30,6 +34,24 @@ export function SchoolCard({
   onCompareToggle,
   compareDisabled = false,
 }: SchoolCardProps) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  const handleViewDetails = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    navigate(`/schools/${id}`);
+  };
+
+  const handleCompareClick = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    onCompareToggle();
+  };
   return (
     <div className={`bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ${isSelected ? 'ring-2 ring-blue-600' : ''}`}>
       <div className="relative h-48 overflow-hidden">
@@ -92,14 +114,17 @@ export function SchoolCard({
             <span className="text-gray-500">Starting from</span>
             <div className="text-blue-600 font-semibold">{pricing}</div>
           </div>
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          <button 
+            onClick={handleViewDetails}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
             View Details
           </button>
         </div>
 
         {/* Compare Button */}
         <button
-          onClick={onCompareToggle}
+          onClick={handleCompareClick}
           disabled={compareDisabled && !isSelected}
           className={`w-full mt-4 px-4 py-2 rounded-lg font-medium transition-colors ${
             isSelected
