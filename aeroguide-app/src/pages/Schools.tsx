@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { fetchSchoolById } from '../api/schools';
 import type { FlyingSchool } from '../../utils/example-schools';
 import { useAuth } from '../context/AuthContext';
+import { createInquiry } from '../api/inquiry';
 
 export function Schools() {
   const navigate = useNavigate();
@@ -18,6 +19,15 @@ export function Schools() {
     course: '',
     reviewText: ''
   });
+  const [inquiryFormData, setInquiryFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    subject: '',
+    message: ''
+  });
+  const [isSubmittingInquiry, setIsSubmittingInquiry] = useState(false);
 
   useEffect(() => {
     const loadSchool = async () => {
@@ -66,6 +76,55 @@ export function Schools() {
     });
     alert('Thank you for your review! It will be visible after approval.');
     handleCloseReviewModal();
+  };
+
+  const handleInquirySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!schoolId) return;
+
+    setIsSubmittingInquiry(true);
+    try {
+      // Combine first and last name
+      const name = `${inquiryFormData.firstName} ${inquiryFormData.lastName}`.trim();
+      
+      // Prepare data according to API schema
+      const inquiryData = {
+        name,
+        email: inquiryFormData.email,
+        phone: inquiryFormData.phone || undefined,
+        message: inquiryFormData.message,
+        inquiry_type: 'general'
+      };
+
+      // Include program/subject in message if selected
+      const messageWithSubject = inquiryFormData.subject 
+        ? `Subject: ${inquiryFormData.subject}\n\n${inquiryFormData.message}`
+        : inquiryFormData.message;
+      
+      inquiryData.message = messageWithSubject;
+
+      const response = await createInquiry(schoolId, inquiryData);
+      
+      if (response) {
+        alert('Thank you for your inquiry! We will get back to you soon.');
+        // Reset form
+        setInquiryFormData({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phone: '',
+          subject: '',
+          message: ''
+        });
+      } else {
+        alert('Failed to submit inquiry. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error submitting inquiry:', error);
+      alert('Failed to submit inquiry. Please try again.');
+    } finally {
+      setIsSubmittingInquiry(false);
+    }
   };
 
   if (loading) {
@@ -293,13 +352,15 @@ export function Schools() {
               {/* Inquiry Form */}
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h3 className="mb-4">Request Information</h3>
-                <form className="space-y-4">
+                <form onSubmit={handleInquirySubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-gray-700 mb-2">First Name *</label>
                       <input
                         type="text"
                         required
+                        value={inquiryFormData.firstName}
+                        onChange={(e) => setInquiryFormData(prev => ({ ...prev, firstName: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
                         placeholder="John"
                       />
@@ -309,6 +370,8 @@ export function Schools() {
                       <input
                         type="text"
                         required
+                        value={inquiryFormData.lastName}
+                        onChange={(e) => setInquiryFormData(prev => ({ ...prev, lastName: e.target.value }))}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
                         placeholder="Doe"
                       />
@@ -319,6 +382,8 @@ export function Schools() {
                     <input
                       type="email"
                       required
+                      value={inquiryFormData.email}
+                      onChange={(e) => setInquiryFormData(prev => ({ ...prev, email: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
                       placeholder="john@example.com"
                     />
@@ -327,6 +392,8 @@ export function Schools() {
                     <label className="block text-gray-700 mb-2">Phone Number</label>
                     <input
                       type="tel"
+                      value={inquiryFormData.phone}
+                      onChange={(e) => setInquiryFormData(prev => ({ ...prev, phone: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
                       placeholder="+91 98765 43210"
                     />
@@ -335,18 +402,20 @@ export function Schools() {
                     <label className="block text-gray-700 mb-2">Subject *</label>
                     <select 
                       required
+                      value={inquiryFormData.subject}
+                      onChange={(e) => setInquiryFormData(prev => ({ ...prev, subject: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
                     >
                       <option value="">Select program interest</option>
                       {school.programs && school.programs.length > 0 ? (
                         school.programs.map((program, index) => (
-                          <option key={index}>{program.name}</option>
+                          <option key={index} value={program.name}>{program.name}</option>
                         ))
                       ) : (
                         <>
-                          <option>Private Pilot License</option>
-                          <option>Commercial Pilot License</option>
-                          <option>Instrument Rating</option>
+                          <option value="Private Pilot License">Private Pilot License</option>
+                          <option value="Commercial Pilot License">Commercial Pilot License</option>
+                          <option value="Instrument Rating">Instrument Rating</option>
                         </>
                       )}
                     </select>
@@ -356,6 +425,8 @@ export function Schools() {
                     <textarea
                       required
                       rows={4}
+                      value={inquiryFormData.message}
+                      onChange={(e) => setInquiryFormData(prev => ({ ...prev, message: e.target.value }))}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
                       placeholder="Tell us about your aviation goals..."
                     ></textarea>
@@ -373,9 +444,11 @@ export function Schools() {
                   </div>
                   <button 
                     type="submit"
-                    className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
+                    disabled={isSubmittingInquiry}
+                    className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Send Inquiry
+                    {isSubmittingInquiry && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isSubmittingInquiry ? 'Sending...' : 'Send Inquiry'}
                   </button>
                 </form>
               </div>

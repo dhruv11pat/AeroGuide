@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { withAuth } from '@/lib/middleware';
 import { createInquirySchema } from '@/lib/validations';
 import { JWTPayload } from '@/lib/jwt';
@@ -73,8 +73,8 @@ async function createInquiry(
       );
     }
 
-    // Create inquiry
-    const { data: inquiry, error } = await supabase
+    // Create inquiry using admin client to bypass RLS
+    const { data: inquiry, error } = await supabaseAdmin
       .from('inquiries')
       .insert({
         school_id: schoolId,
